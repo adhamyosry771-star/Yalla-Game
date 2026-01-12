@@ -18,7 +18,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, isOffic
   const [allBanners, setAllBanners] = useState<any[]>([]);
   const [allRoomBgs, setAllRoomBgs] = useState<any[]>([]);
   const [allNews, setAllNews] = useState<any[]>([]);
-  const [adminTab, setAdminTab] = useState<'users' | 'news' | 'banners' | 'bgs'>('users');
+  const [allRooms, setAllRooms] = useState<any[]>([]);
+  const [adminTab, setAdminTab] = useState<'users' | 'news' | 'banners' | 'bgs' | 'rooms'>('users');
   
   const [showChargePopup, setShowChargePopup] = useState<string | null>(null);
   const [showIdPopup, setShowIdPopup] = useState<string | null>(null);
@@ -63,8 +64,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, isOffic
       setAllRoomBgs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    const unsubRooms = onSnapshot(query(collection(db, "rooms"), orderBy("createdAt", "desc")), (snap) => {
+      setAllRooms(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
     return () => {
-      unsubUsers(); unsubNews(); unsubBanners(); unsubBgs();
+      unsubUsers(); unsubNews(); unsubBanners(); unsubBgs(); unsubRooms();
     };
   }, [isOpen]);
 
@@ -133,9 +138,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, isOffic
           <button onClick={onClose} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white"><i className="fas fa-times"></i></button>
         </div>
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-          {['users', 'news', 'banners', 'bgs'].map((tab) => (
+          {['users', 'rooms', 'news', 'banners', 'bgs'].map((tab) => (
             <button key={tab} onClick={() => setAdminTab(tab as any)} className={`flex-shrink-0 px-4 py-2 text-[10px] font-black rounded-xl transition-all uppercase ${adminTab === tab ? 'bg-purple-600 text-white' : 'bg-white/5 text-purple-300/60'}`}>
-              {tab === 'users' ? 'المستخدمين' : tab === 'news' ? 'الأخبار' : tab === 'banners' ? 'البنرات' : 'الخلفيات'}
+              {tab === 'users' ? 'المستخدمين' : tab === 'rooms' ? 'الغرف' : tab === 'news' ? 'الأخبار' : tab === 'banners' ? 'البنرات' : 'الخلفيات'}
             </button>
           ))}
         </div>
@@ -162,6 +167,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, isOffic
                   <button onClick={() => { setShowIdPopup(u.id); setNewCustomId(u.customId || ''); }} className="bg-blue-600/20 text-blue-400 text-[10px] py-2 rounded-xl border border-blue-600/30 font-black">تعديل ID</button>
                   <button onClick={() => setShowBanPopup(u.id)} className="bg-red-600/20 text-red-400 text-[10px] py-2 rounded-xl border border-red-600/30 font-black">حظر</button>
                   {u.banUntil && <button onClick={() => handleUserUpdate(u.id, { banUntil: deleteField() })} className="bg-purple-600/20 text-purple-400 text-[10px] py-2 rounded-xl border border-purple-600/30 font-black">فك الحظر</button>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {adminTab === 'rooms' && (
+          <div className="space-y-4">
+            <p className="text-[10px] font-black text-purple-400 uppercase tracking-widest px-1">إدارة الغرف النشطة ({allRooms.length})</p>
+            {allRooms.length === 0 ? (
+              <div className="text-center py-20 opacity-20"><i className="fas fa-door-closed text-4xl mb-2"></i><p className="text-xs font-bold">لا توجد غرف نشطة</p></div>
+            ) : allRooms.map(room => (
+              <div key={room.id} className="bg-white/5 rounded-2xl border border-white/10 flex items-stretch gap-4 animate-in fade-in overflow-hidden h-24">
+                <div className="w-24 h-full flex-shrink-0">
+                  <img src={room.coverImage} className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 py-3 flex flex-col justify-center min-w-0">
+                  <p className="text-xs font-black text-white truncate">{room.title}</p>
+                  <p className="text-[9px] text-purple-400 font-bold">ID: {room.roomIdDisplay || room.id.substring(0,8)}</p>
+                  <p className="text-[8px] text-white/40 mt-1 truncate">بواسطة: {room.owner?.name}</p>
+                </div>
+                <div className="flex items-center gap-3 px-4">
+                  <div className="bg-white/5 px-2 py-1 rounded-lg border border-white/5 flex items-center gap-1">
+                    <i className="fas fa-users text-[8px] text-purple-400"></i>
+                    <span className="text-[10px] font-black text-white">{room.participantsCount || 0}</span>
+                  </div>
+                  <button 
+                    onClick={async () => {
+                      if(confirm(`هل تريد حقاً حذف غرفة "${room.title}" نهائياً؟`)) {
+                        await deleteDoc(doc(db, "rooms", room.id));
+                        alert("تم حذف الغرفة");
+                      }
+                    }} 
+                    className="w-10 h-10 rounded-xl bg-red-600/20 text-red-500 border border-red-600/30 flex items-center justify-center active:scale-90 transition-all"
+                  >
+                    <i className="fas fa-trash-alt text-sm"></i>
+                  </button>
                 </div>
               </div>
             ))}
