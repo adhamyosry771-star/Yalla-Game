@@ -32,7 +32,7 @@ const App: React.FC = () => {
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
   // منطق الفقاعة المتحركة
-  const [bubblePos, setBubblePos] = useState({ x: window.innerWidth - 90, y: window.innerHeight - 200 });
+  const [bubblePos, setBubblePos] = useState({ x: window.innerWidth - 85, y: window.innerHeight - 220 });
   const isDragging = useRef(false);
   const hasMoved = useRef(false); 
   const dragOffset = useRef({ x: 0, y: 0 });
@@ -85,12 +85,11 @@ const App: React.FC = () => {
     }
   }, [banners]);
 
-  // دالة بدء السحب
   const onMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
     isDragging.current = true;
     hasMoved.current = false;
-    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? (e as TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY;
     dragOffset.current = {
       x: clientX - bubblePos.x,
       y: clientY - bubblePos.y
@@ -101,11 +100,11 @@ const App: React.FC = () => {
     const onMouseMove = (e: MouseEvent | TouchEvent) => {
       if (!isDragging.current) return;
       hasMoved.current = true;
-      const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-      const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+      const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
+      const clientY = 'touches' in e ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY;
       
-      const nextX = Math.min(Math.max(10, clientX - dragOffset.current.x), window.innerWidth - 75);
-      const nextY = Math.min(Math.max(10, clientY - dragOffset.current.y), window.innerHeight - 80);
+      const nextX = Math.min(Math.max(0, clientX - dragOffset.current.x), window.innerWidth - 64);
+      const nextY = Math.min(Math.max(0, clientY - dragOffset.current.y), window.innerHeight - 64);
       
       setBubblePos({ x: nextX, y: nextY });
     };
@@ -198,20 +197,20 @@ const App: React.FC = () => {
         <button onClick={() => setActiveTab('me')} className={`flex flex-col items-center gap-0.5 ${activeTab === 'me' ? 'text-purple-400' : 'text-purple-300/30'}`}><i className="fas fa-user text-sm"></i><span className="text-[8px] font-black uppercase">أنا</span></button>
       </nav>
 
-      {/* الفقاعة العائمة المتحركة */}
+      {/* الفقاعة العائمة المتحركة المحسنة */}
       {isMinimized && activeRoom && (
         <div 
           className="fixed z-[300] flex flex-col items-end gap-1 touch-none"
           style={{ left: bubblePos.x, top: bubblePos.y }}
         >
-          {/* زر إغلاق (X) شفاف */}
+          {/* زر إغلاق (X) على جهة اليمين - شفاف وعصري */}
           <button 
             onClick={(e) => {
               e.stopPropagation();
               setActiveRoom(null);
               setIsMinimized(false);
             }}
-            className="w-6 h-6 bg-black/30 backdrop-blur-md text-white/70 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all z-[310] border border-white/10 hover:bg-red-500/50 hover:text-white"
+            className="w-6 h-6 bg-black/40 backdrop-blur-xl text-white/80 rounded-full flex items-center justify-center shadow-lg active:scale-75 transition-all z-[310] border border-white/20 hover:bg-red-500/40 mb-1"
           >
             <i className="fas fa-times text-[10px]"></i>
           </button>
@@ -222,9 +221,10 @@ const App: React.FC = () => {
             onClick={() => {
               if (!hasMoved.current) setIsMinimized(false);
             }}
-            className="w-16 h-16 rounded-full border-4 border-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.4)] cursor-move overflow-hidden bg-[#1a0b2e] active:scale-95 transition-transform animate-gentle-rotate"
+            className="w-16 h-16 rounded-full border-[3px] border-purple-500/80 shadow-[0_0_20px_rgba(168,85,247,0.4)] cursor-move overflow-hidden bg-[#1a0b2e] active:scale-95 transition-all animate-slow-rotate relative"
           >
-            <img src={activeRoom.coverImage} className="w-full h-full object-cover pointer-events-none" alt="minimized" />
+            <img src={activeRoom.coverImage} className="w-full h-full object-cover pointer-events-none select-none" alt="minimized" />
+            <div className="absolute inset-0 bg-gradient-to-t from-purple-500/20 to-transparent pointer-events-none"></div>
           </div>
         </div>
       )}
@@ -244,12 +244,12 @@ const App: React.FC = () => {
       )}
 
       <style>{`
-        @keyframes gentle-rotate {
+        @keyframes slowRotate {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
-        .animate-gentle-rotate {
-          animation: gentle-rotate 8s linear infinite;
+        .animate-slow-rotate {
+          animation: slowRotate 8s linear infinite;
         }
       `}</style>
     </div>

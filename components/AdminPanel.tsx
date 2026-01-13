@@ -19,7 +19,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, isOffic
   const [allRoomBgs, setAllRoomBgs] = useState<any[]>([]);
   const [allNews, setAllNews] = useState<any[]>([]);
   const [allRooms, setAllRooms] = useState<any[]>([]);
-  const [adminTab, setAdminTab] = useState<'users' | 'news' | 'banners' | 'bgs' | 'rooms'>('users');
+  const [adminTab, setAdminTab] = useState<'users' | 'news' | 'banners' | 'bgs' | 'rooms' | 'design'>('users');
   
   const [showChargePopup, setShowChargePopup] = useState<string | null>(null);
   const [showIdPopup, setShowIdPopup] = useState<string | null>(null);
@@ -32,18 +32,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, isOffic
   const [newsImage, setNewsImage] = useState<string | null>(null);
   
   const [bannerTitle, setBannerTitle] = useState('');
-  const [bannerDesc, setBannerDesc] = useState('');
   const [bannerImage, setBannerImage] = useState<string | null>(null);
 
   const [roomBgImage, setRoomBgImage] = useState<string | null>(null);
   const [loginBgImage, setLoginBgImage] = useState<string | null>(null);
   const [loginLogoImage, setLoginLogoImage] = useState<string | null>(null);
 
+  // أيقونات المايكات المخصصة
+  const [micOpenIcon, setMicOpenIcon] = useState<string | null>(null);
+  const [micLockedIcon, setMicLockedIcon] = useState<string | null>(null);
+  const [micOccupiedBg, setMicOccupiedBg] = useState<string | null>(null);
+
   const newsInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const roomBgInputRef = useRef<HTMLInputElement>(null);
   const loginBgInputRef = useRef<HTMLInputElement>(null);
   const loginLogoInputRef = useRef<HTMLInputElement>(null);
+  const micOpenInputRef = useRef<HTMLInputElement>(null);
+  const micLockedInputRef = useRef<HTMLInputElement>(null);
+  const micOccupiedInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -68,8 +75,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, isOffic
       setAllRooms(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    const unsubDesign = onSnapshot(doc(db, "settings", "design"), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setMicOpenIcon(data.micOpenIcon || null);
+        setMicLockedIcon(data.micLockedIcon || null);
+        setMicOccupiedBg(data.micOccupiedBg || null);
+      }
+    });
+
     return () => {
-      unsubUsers(); unsubNews(); unsubBanners(); unsubBgs(); unsubRooms();
+      unsubUsers(); unsubNews(); unsubBanners(); unsubBgs(); unsubRooms(); unsubDesign();
     };
   }, [isOpen]);
 
@@ -118,6 +134,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, isOffic
     }
   };
 
+  const saveDesignSettings = async () => {
+    try {
+      await setDoc(doc(db, "settings", "design"), {
+        micOpenIcon,
+        micLockedIcon,
+        micOccupiedBg
+      }, { merge: true });
+      alert("تم حفظ إعدادات التصميم");
+    } catch (e) {
+      alert("خطأ في الحفظ");
+    }
+  };
+
   const filteredUsers = searchId.trim() 
     ? allUsers.filter(u => u.customId?.toLowerCase().includes(searchId.toLowerCase()))
     : allUsers;
@@ -131,6 +160,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, isOffic
       <input type="file" ref={roomBgInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageSelect(e, setRoomBgImage)} />
       <input type="file" ref={loginBgInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageSelect(e, setLoginBgImage)} />
       <input type="file" ref={loginLogoInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageSelect(e, setLoginLogoImage)} />
+      
+      <input type="file" ref={micOpenInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageSelect(e, setMicOpenIcon)} />
+      <input type="file" ref={micLockedInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageSelect(e, setMicLockedIcon)} />
+      <input type="file" ref={micOccupiedInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageSelect(e, setMicOccupiedBg)} />
 
       <header className="p-4 border-b border-white/10 flex flex-col bg-[#0d051a] sticky top-0 z-50">
         <div className="flex justify-between items-center mb-4">
@@ -138,9 +171,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, isOffic
           <button onClick={onClose} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white"><i className="fas fa-times"></i></button>
         </div>
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-          {['users', 'rooms', 'news', 'banners', 'bgs'].map((tab) => (
+          {['users', 'rooms', 'news', 'banners', 'bgs', 'design'].map((tab) => (
             <button key={tab} onClick={() => setAdminTab(tab as any)} className={`flex-shrink-0 px-4 py-2 text-[10px] font-black rounded-xl transition-all uppercase ${adminTab === tab ? 'bg-purple-600 text-white' : 'bg-white/5 text-purple-300/60'}`}>
-              {tab === 'users' ? 'المستخدمين' : tab === 'rooms' ? 'الغرف' : tab === 'news' ? 'الأخبار' : tab === 'banners' ? 'البنرات' : 'الخلفيات'}
+              {tab === 'users' ? 'المستخدمين' : tab === 'rooms' ? 'الغرف' : tab === 'news' ? 'الأخبار' : tab === 'banners' ? 'البنرات' : tab === 'bgs' ? 'الخلفيات' : 'التصميم'}
             </button>
           ))}
         </div>
@@ -242,7 +275,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, isOffic
                 </button>
                 <button onClick={async () => {
                   if (!bannerImage) return alert("اختر صورة");
-                  await addDoc(collection(db, "banners"), { title: bannerTitle, desc: bannerDesc, imageUrl: bannerImage, createdAt: serverTimestamp() });
+                  await addDoc(collection(db, "banners"), { title: bannerTitle, imageUrl: bannerImage, createdAt: serverTimestamp() });
                   setBannerTitle(''); setBannerImage(null); alert("تم الإضافة");
                 }} className="w-full bg-purple-600 py-3 rounded-xl text-xs font-black shadow-lg text-white">إضافة البنر</button>
              </div>
@@ -317,6 +350,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, isOffic
                   await setDoc(doc(db, "settings", "appearance"), data, { merge: true });
                   alert("تم تحديث مظهر الدخول");
                }} className="w-full bg-blue-600 py-3 rounded-xl text-xs font-black text-white shadow-lg">حفظ مظهر الدخول</button>
+            </div>
+          </div>
+        )}
+
+        {adminTab === 'design' && (
+          <div className="space-y-6">
+            <div className="bg-white/5 p-5 rounded-[2rem] border border-white/10 space-y-6 shadow-2xl">
+              <div className="flex justify-between items-center">
+                <p className="text-[10px] font-black text-purple-400 uppercase tracking-widest">تخصيص أيقونات الميكروفونات</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-bold text-white/40 mr-2 uppercase tracking-tighter">أيقونة المايك المفتوح</label>
+                  <button onClick={() => micOpenInputRef.current?.click()} className="w-full h-16 bg-black/40 rounded-2xl border-2 border-dashed border-white/5 flex items-center justify-center overflow-hidden transition-all hover:bg-black/60">
+                    {micOpenIcon ? <img src={micOpenIcon} className="h-10 w-10 object-contain" /> : <i className="fas fa-plus text-white/20"></i>}
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-bold text-white/40 mr-2 uppercase tracking-tighter">أيقونة المايك المغلق (Lock)</label>
+                  <button onClick={() => micLockedInputRef.current?.click()} className="w-full h-16 bg-black/40 rounded-2xl border-2 border-dashed border-white/5 flex items-center justify-center overflow-hidden transition-all hover:bg-black/60">
+                    {micLockedIcon ? <img src={micLockedIcon} className="h-10 w-10 object-contain" /> : <i className="fas fa-plus text-white/20"></i>}
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-bold text-white/40 mr-2 uppercase tracking-tighter">أيقونة خلفية المايك المشغول</label>
+                  <button onClick={() => micOccupiedInputRef.current?.click()} className="w-full h-16 bg-black/40 rounded-2xl border-2 border-dashed border-white/5 flex items-center justify-center overflow-hidden transition-all hover:bg-black/60">
+                    {micOccupiedBg ? <img src={micOccupiedBg} className="h-10 w-10 object-contain" /> : <i className="fas fa-plus text-white/20"></i>}
+                  </button>
+                </div>
+              </div>
+
+              <button onClick={saveDesignSettings} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 py-4 rounded-2xl font-black text-xs text-white shadow-xl active:scale-95 transition-transform border border-white/10">حفظ التغييرات</button>
             </div>
           </div>
         )}
