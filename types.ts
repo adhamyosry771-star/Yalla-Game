@@ -31,4 +31,13 @@ export interface ChatMessage {
   text: string;
   type: 'text' | 'gift';
   giftName?: string;
+  image?: string; // Support for GIF emojis
+}
+
+// Added Artifact interface used by ArtifactCard component
+export interface Artifact {
+  id: string;
+  styleName: string;
+  html: string;
+  status: 'streaming' | 'completed' | string;
 }
