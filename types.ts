@@ -35,7 +35,7 @@ export interface ChatMessage {
   userId: string;
   userName: string;
   text: string;
-  type: 'text' | 'gift';
+  type: 'text' | 'gift' | 'join';
   giftName?: string;
   image?: string; // Support for GIF emojis
 }
