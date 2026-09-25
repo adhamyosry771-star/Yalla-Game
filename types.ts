@@ -11,6 +11,8 @@ export interface User {
   wealthXP?: number;
   charismaLevel?: number;
   wealthLevel?: number;
+  hasSecretClub?: boolean;
+  secretClubPassword?: string;
 }
 
 export interface Room {
@@ -20,6 +22,7 @@ export interface Room {
   participantsCount: number;
   tags: string[];
   coverImage: string;
+  isSecretClub?: boolean;
 }
 
 export interface Gift {

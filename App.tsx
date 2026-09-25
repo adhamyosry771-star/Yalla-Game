@@ -103,6 +103,14 @@ const App: React.FC = () => {
   const [showHasRoomError, setShowHasRoomError] = useState(false);
   const [shouldOpenWalletOnProfile, setShouldOpenWalletOnProfile] = useState(false);
   
+  const [showSecretClubPasswordModal, setShowSecretClubPasswordModal] = useState(false);
+  const [secretClubPasswordInput, setSecretClubPasswordInput] = useState('');
+  const [secretClubPasswordError, setSecretClubPasswordError] = useState('');
+  const [showSecretClubWelcomeModal, setShowSecretClubWelcomeModal] = useState(false);
+  const [isInSecretClub, setIsInSecretClub] = useState(false);
+  const [isCreateSecretRoom, setIsCreateSecretRoom] = useState(false);
+  const [hasRoomErrorCustomMsg, setHasRoomErrorCustomMsg] = useState('');
+  
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadPrivateCount, setUnreadPrivateCount] = useState(0);
   const [lastReadTimestamp, setLastReadTimestamp] = useState<number>(() => {
@@ -116,6 +124,8 @@ const App: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [banners, setBanners] = useState<any[]>([]);
   const [banners2, setBanners2] = useState<any[]>([]);
+  const [secretClubBanners, setSecretClubBanners] = useState<any[]>([]);
+  const [secretClubBanners2, setSecretClubBanners2] = useState<any[]>([]);
   const [designSettings, setDesignSettings] = useState<any>(null);
   const [topWealthUsers, setTopWealthUsers] = useState<any[]>([]);
   const [topCharismaUsers, setTopCharismaUsers] = useState<any[]>([]);
@@ -123,6 +133,8 @@ const App: React.FC = () => {
   const [carnivalSettings, setCarnivalSettings] = useState<any>(null);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [currentBannerIndex2, setCurrentBannerIndex2] = useState(0);
+  const [currentSecretClubBannerIndex, setCurrentSecretClubBannerIndex] = useState(0);
+  const [currentSecretClubBannerIndex2, setCurrentSecretClubBannerIndex2] = useState(0);
 
   // تتبع العناصر التي تمت معالجة انتهاء صلاحيتها لمنع التكرار
   const processedExpirations = useRef<Set<string>>(new Set());
@@ -518,6 +530,18 @@ const App: React.FC = () => {
       setBanners2(dbBanners2);
     });
 
+    const secretClubBannersQuery = query(collection(db, "secretClubBanners"), orderBy("createdAt", "desc"), limit(10));
+    const unsubscribeSecretClubBanners = onSnapshot(secretClubBannersQuery, (snapshot) => {
+      const dbClubBanners = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSecretClubBanners(dbClubBanners);
+    });
+
+    const secretClubBanners2Query = query(collection(db, "secretClubBanners2"), orderBy("createdAt", "desc"), limit(10));
+    const unsubscribeSecretClubBanners2 = onSnapshot(secretClubBanners2Query, (snapshot) => {
+      const dbClubBanners2 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSecretClubBanners2(dbClubBanners2);
+    });
+
     const roomsQuery = query(collection(db, "rooms"), orderBy("createdAt", "desc"), limit(150));
     const unsubscribeRooms = onSnapshot(roomsQuery, (snapshot) => {
       const fetchedRooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
@@ -527,6 +551,8 @@ const App: React.FC = () => {
     return () => {
       unsubscribeBanners();
       unsubscribeBanners2();
+      unsubscribeSecretClubBanners();
+      unsubscribeSecretClubBanners2();
       unsubscribeRooms();
     };
   }, [language, carnivalSettings]);
@@ -548,6 +574,24 @@ const App: React.FC = () => {
       return () => clearInterval(interval);
     }
   }, [banners2]);
+
+  useEffect(() => {
+    if (secretClubBanners.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentSecretClubBannerIndex(prev => (prev + 1) % secretClubBanners.length);
+      }, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [secretClubBanners]);
+
+  useEffect(() => {
+    if (secretClubBanners2.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentSecretClubBannerIndex2(prev => (prev + 1) % secretClubBanners2.length);
+      }, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [secretClubBanners2]);
 
   // Back key event interceptors for App-level state
   useEffect(() => {
@@ -604,6 +648,33 @@ const App: React.FC = () => {
       });
     }
   }, [showHasRoomError]);
+
+  useEffect(() => {
+    if (showSecretClubPasswordModal) {
+      return registerBackAction(() => {
+        setShowSecretClubPasswordModal(false);
+        return true;
+      });
+    }
+  }, [showSecretClubPasswordModal]);
+
+  useEffect(() => {
+    if (showSecretClubWelcomeModal) {
+      return registerBackAction(() => {
+        setShowSecretClubWelcomeModal(false);
+        return true;
+      });
+    }
+  }, [showSecretClubWelcomeModal]);
+
+  useEffect(() => {
+    if (isInSecretClub) {
+      return registerBackAction(() => {
+        setIsInSecretClub(false);
+        return true;
+      });
+    }
+  }, [isInSecretClub]);
 
   useEffect(() => {
     if (activeTab !== 'home' && !showNotifications) {
@@ -739,10 +810,51 @@ const App: React.FC = () => {
 
   return (
     <div className={`min-h-screen max-w-md mx-auto bg-[#1a0b2e] shadow-2xl relative overflow-hidden flex flex-col border-x border-white/5 ${(!showNotifications && !showCarnivalPage && !showWealthLeaderboard) ? 'pb-16' : ''}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Secret Club Custom Background (Static or Animated) - In Home tab only */}
+      {isInSecretClub && activeTab === 'home' && !showNotifications && !showCarnivalPage && !showWealthLeaderboard && designSettings?.secretClubBg && (
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          {isVideoUrl(designSettings.secretClubBg) ? (
+            <video 
+              src={designSettings.secretClubBg} 
+              autoPlay 
+              loop 
+              muted 
+              playsInline 
+              className="w-full h-full object-cover" 
+            />
+          ) : (
+            <img 
+              src={designSettings.secretClubBg} 
+              className="w-full h-full object-cover" 
+              alt="Secret Club Background" 
+            />
+          )}
+          {/* نسبة بسيطة من اللون الأسود عشان الأيقونات تظهر بوضوح زي خلفيات الغرفة */}
+          <div className="absolute inset-0 bg-black/45 pointer-events-none"></div>
+        </div>
+      )}
+
       {activeTab === 'home' && !showNotifications && !showCarnivalPage && !showWealthLeaderboard && (
-        <header className="px-5 py-3 flex justify-between items-center sticky top-0 z-10 bg-[#1a0b2e]/90 backdrop-blur-md">
+        <header className={`px-5 py-3 flex justify-between items-center sticky top-0 z-10 ${isInSecretClub ? 'bg-transparent' : 'bg-[#1a0b2e]/90 backdrop-blur-md'} transition-colors duration-300`}>
           <h1 className="text-lg font-black tracking-tighter bg-gradient-to-r from-purple-400 via-pink-500 via-fuchsia-500 to-purple-400 bg-clip-text text-transparent animate-gradient-x">Yalla Party</h1>
           <div className="flex gap-2">
+            {userData?.hasSecretClub && (
+              <button 
+                className="w-8 h-8 relative bg-white/5 rounded-xl flex items-center justify-center border border-white/10 text-white active:scale-90 transition-all hover:bg-white/10"
+                title={isInSecretClub ? t("الخروج من النادي السري", "Exit Secret Club") : t("النادي السري", "Secret Club")}
+                onClick={() => {
+                  if (isInSecretClub) {
+                    setIsInSecretClub(false);
+                  } else {
+                    setSecretClubPasswordInput('');
+                    setSecretClubPasswordError('');
+                    setShowSecretClubPasswordModal(true);
+                  }
+                }}
+              >
+                <i className="fas fa-user-secret text-xs"></i>
+              </button>
+            )}
             <button 
               className="w-8 h-8 relative bg-white/5 rounded-xl flex items-center justify-center border border-white/10 text-white active:scale-90 transition-all"
               onClick={() => {}}
@@ -792,53 +904,61 @@ const App: React.FC = () => {
       ) : (
         <>
           {activeTab === 'home' && (
-            <main className="flex-1 overflow-y-auto px-4 py-2 space-y-6">
+            <main className="flex-1 overflow-y-auto px-4 py-2 space-y-6 relative z-10">
               {/* تم تقليل حواف البنر من rounded-[2.5rem] إلى rounded-2xl */}
-              <div className="w-full h-32 rounded-2xl overflow-hidden relative shadow-2xl border border-white/5 bg-white/5 group">
-                {banners.length > 0 ? banners.map((banner, index) => (
-                  <div 
-                    key={banner.id} 
-                    onClick={() => {
-                      if (banner.isEvent) {
-                        setShowCarnivalPage(true);
-                      }
-                    }}
-                    className={`absolute inset-0 transition-opacity duration-1000 ${index === currentBannerIndex ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'} ${banner.isEvent ? 'cursor-pointer' : ''}`}
-                  >
-                    <img src={banner.imageUrl} className="w-full h-full object-cover" />
-                    {!banner.isEvent && (
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#1a0b2e]/90 via-transparent to-transparent p-5 flex flex-col justify-end">
-                        <h4 className="font-black text-sm text-white text-shadow-sm">{banner.title}</h4>
+              {(() => {
+                const activeBanners = isInSecretClub ? secretClubBanners : banners;
+                const activeBannerIndex = isInSecretClub ? currentSecretClubBannerIndex : currentBannerIndex;
+                const setActiveBannerIndex = isInSecretClub ? setCurrentSecretClubBannerIndex : setCurrentBannerIndex;
+
+                return (
+                  <div className="w-full h-32 rounded-2xl overflow-hidden relative shadow-2xl border border-white/5 bg-white/5 group">
+                    {activeBanners.length > 0 ? activeBanners.map((banner, index) => (
+                      <div 
+                        key={banner.id} 
+                        onClick={() => {
+                          if (!isInSecretClub && banner.isEvent) {
+                            setShowCarnivalPage(true);
+                          }
+                        }}
+                        className={`absolute inset-0 transition-opacity duration-1000 ${index === activeBannerIndex ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'} ${!isInSecretClub && banner.isEvent ? 'cursor-pointer' : ''}`}
+                      >
+                        <img src={banner.imageUrl} className="w-full h-full object-cover" />
+                        {(!banner.isEvent || isInSecretClub) && banner.title && (
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#1a0b2e]/90 via-transparent to-transparent p-5 flex flex-col justify-end">
+                            <h4 className="font-black text-sm text-white text-shadow-sm">{banner.title}</h4>
+                          </div>
+                        )}
                       </div>
+                    )) : <div className="h-full flex items-center justify-center opacity-20"><i className="fas fa-images"></i></div>}
+
+                    {activeBanners.length > 1 && (
+                      <>
+                        {/* Left click area to navigate to NEXT banner image */}
+                        <div 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setActiveBannerIndex(prev => (prev + 1) % activeBanners.length);
+                          }}
+                          className="absolute top-0 bottom-0 left-0 w-[45%] z-20 cursor-pointer"
+                          title="التالي"
+                        />
+                        {/* Right click area to navigate to PREVIOUS banner image */}
+                        <div 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setActiveBannerIndex(prev => (prev - 1 + activeBanners.length) % activeBanners.length);
+                          }}
+                          className="absolute top-0 bottom-0 right-0 w-[45%] z-20 cursor-pointer"
+                          title="السابق"
+                        />
+                      </>
                     )}
                   </div>
-                )) : <div className="h-full flex items-center justify-center opacity-20"><i className="fas fa-images"></i></div>}
-
-                {banners.length > 1 && (
-                  <>
-                    {/* Left click area to navigate to NEXT banner image */}
-                    <div 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        setCurrentBannerIndex(prev => (prev + 1) % banners.length);
-                      }}
-                      className="absolute top-0 bottom-0 left-0 w-[45%] z-20 cursor-pointer"
-                      title="التالي"
-                    />
-                    {/* Right click area to navigate to PREVIOUS banner image */}
-                    <div 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        setCurrentBannerIndex(prev => (prev - 1 + banners.length) % banners.length);
-                      }}
-                      className="absolute top-0 bottom-0 right-0 w-[45%] z-20 cursor-pointer"
-                      title="السابق"
-                    />
-                  </>
-                )}
-              </div>
+                );
+              })()}
 
               {/* Menu Buttons & Voice Rooms wrapper with tight top spacing */}
               <div className="space-y-2.5 w-full">
@@ -882,16 +1002,18 @@ const App: React.FC = () => {
                 )}
 
                 <section>
-                  <h2 className="text-base font-black text-white mb-3">{t("غرف صوتية", "Voice Rooms")}</h2>
+                  <h2 className="text-base font-black text-white mb-3">
+                    {isInSecretClub ? t("غرف النادي السري", "Secret Club Rooms") : t("غرف صوتية", "Voice Rooms")}
+                  </h2>
                 
                 {(() => {
-                  let orderedRooms = [...rooms];
+                  let orderedRooms = rooms.filter(r => isInSecretClub ? !!r.isSecretClub : !r.isSecretClub);
                   
                   // Find pinned rooms in the live rooms array
-                  const pinned1 = designSettings?.topRoom1Id ? orderedRooms.find(r => r.id === designSettings.topRoom1Id) : null;
-                  const pinned2 = designSettings?.topRoom2Id ? orderedRooms.find(r => r.id === designSettings.topRoom2Id) : null;
-                  const pinned3 = designSettings?.topRoom3Id ? orderedRooms.find(r => r.id === designSettings.topRoom3Id) : null;
-                  const pinned4 = designSettings?.topRoom4Id ? orderedRooms.find(r => r.id === designSettings.topRoom4Id) : null;
+                  const pinned1 = !isInSecretClub && designSettings?.topRoom1Id ? orderedRooms.find(r => r.id === designSettings.topRoom1Id) : null;
+                  const pinned2 = !isInSecretClub && designSettings?.topRoom2Id ? orderedRooms.find(r => r.id === designSettings.topRoom2Id) : null;
+                  const pinned3 = !isInSecretClub && designSettings?.topRoom3Id ? orderedRooms.find(r => r.id === designSettings.topRoom3Id) : null;
+                  const pinned4 = !isInSecretClub && designSettings?.topRoom4Id ? orderedRooms.find(r => r.id === designSettings.topRoom4Id) : null;
 
                   // Exclude pinned rooms from their original index positions to avoid duplicates
                   if (pinned1) orderedRooms = orderedRooms.filter(r => r.id !== pinned1.id);
@@ -936,6 +1058,24 @@ const App: React.FC = () => {
                   // Append rest of rooms
                   finalRooms.push(...orderedRooms);
 
+                  if (finalRooms.length === 0) {
+                    return (
+                      <div className="py-10 px-4 rounded-2xl border border-white/5 bg-white/5 text-center flex flex-col items-center justify-center gap-2">
+                        <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-purple-300/60">
+                          <i className={`fas ${isInSecretClub ? 'fa-user-secret' : 'fa-headphones'} text-xl`}></i>
+                        </div>
+                        <h4 className="text-xs font-black text-white">
+                          {isInSecretClub ? t("لا توجد غرف في النادي السري حالياً", "No rooms in Secret Club currently") : t("لا توجد غرف حالياً", "No rooms currently")}
+                        </h4>
+                        <p className="text-[10px] text-white/40 font-bold max-w-xs">
+                          {isInSecretClub 
+                            ? t("اضغط على زر (+) بالأسفل لإنشاء غرفة خاصة بالنادي السري", "Click (+) below to create a Secret Club room")
+                            : t("اضغط على زر (+) بالأسفل لإنشاء غرفة جديدة", "Click (+) below to create a new room")}
+                        </p>
+                      </div>
+                    );
+                  }
+
                   const top4Rooms = finalRooms.slice(0, 4);
                   const remainingRooms = finalRooms.slice(4);
 
@@ -946,10 +1086,12 @@ const App: React.FC = () => {
                         <div className="grid grid-cols-2 gap-3">
                           {top4Rooms.map((room, index) => {
                             let frameUrl = undefined;
-                            if (index === 0) frameUrl = designSettings?.roomFrameTop1 || undefined;
-                            else if (index === 1) frameUrl = designSettings?.roomFrameTop2 || undefined;
-                            else if (index === 2) frameUrl = designSettings?.roomFrameTop3 || undefined;
-                            else if (index === 3) frameUrl = designSettings?.roomFrameTop4 || undefined;
+                            if (!isInSecretClub && !room.isSecretClub) {
+                              if (index === 0) frameUrl = designSettings?.roomFrameTop1 || undefined;
+                              else if (index === 1) frameUrl = designSettings?.roomFrameTop2 || undefined;
+                              else if (index === 2) frameUrl = designSettings?.roomFrameTop3 || undefined;
+                              else if (index === 3) frameUrl = designSettings?.roomFrameTop4 || undefined;
+                            }
                             return (
                               <RoomCard 
                                 key={room.id} 
@@ -964,55 +1106,63 @@ const App: React.FC = () => {
                       )}
 
                       {/* Secondary Banner Slider (matching width & height aspect ratio perfectly) */}
-                      <div className="w-full aspect-[792/236] h-auto rounded-2xl overflow-hidden relative shadow-lg border border-white/5 bg-white/5 group">
-                        {banners2.length > 0 ? (
-                          <>
-                            {banners2.map((banner, index) => (
-                              <div 
-                                key={banner.id} 
-                                className={`absolute inset-0 transition-opacity duration-1000 ${index === currentBannerIndex2 ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-                              >
-                                <img src={banner.imageUrl} className="w-full h-full object-cover" />
-                                {banner.title && (
-                                  <div className="absolute inset-0 bg-gradient-to-t from-[#1a0b2e]/90 via-transparent to-transparent px-4 py-2 flex flex-col justify-end">
-                                    <h4 className="font-black text-[10px] text-white text-shadow-sm">{banner.title}</h4>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                            
-                            {banners2.length > 1 && (
+                      {(() => {
+                        const activeBanners2 = isInSecretClub ? secretClubBanners2 : banners2;
+                        const activeBannerIndex2 = isInSecretClub ? currentSecretClubBannerIndex2 : currentBannerIndex2;
+                        const setActiveBannerIndex2 = isInSecretClub ? setCurrentSecretClubBannerIndex2 : setCurrentBannerIndex2;
+
+                        return (
+                          <div className="w-full aspect-[792/236] h-auto rounded-2xl overflow-hidden relative shadow-lg border border-white/5 bg-white/5 group">
+                            {activeBanners2.length > 0 ? (
                               <>
-                                {/* Left click area to navigate to NEXT banner image */}
-                                <div 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    setCurrentBannerIndex2(prev => (prev + 1) % banners2.length);
-                                  }}
-                                  className="absolute top-0 bottom-0 left-0 w-[45%] z-20 cursor-pointer"
-                                  title="التالي"
-                                />
-                                {/* Right click area to navigate to PREVIOUS banner image */}
-                                <div 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    setCurrentBannerIndex2(prev => (prev - 1 + banners2.length) % banners2.length);
-                                  }}
-                                  className="absolute top-0 bottom-0 right-0 w-[45%] z-20 cursor-pointer"
-                                  title="السابق"
-                                />
+                                {activeBanners2.map((banner, index) => (
+                                  <div 
+                                    key={banner.id} 
+                                    className={`absolute inset-0 transition-opacity duration-1000 ${index === activeBannerIndex2 ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+                                  >
+                                    <img src={banner.imageUrl} className="w-full h-full object-cover" />
+                                    {banner.title && (
+                                      <div className="absolute inset-0 bg-gradient-to-t from-[#1a0b2e]/90 via-transparent to-transparent px-4 py-2 flex flex-col justify-end">
+                                        <h4 className="font-black text-[10px] text-white text-shadow-sm">{banner.title}</h4>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                                
+                                {activeBanners2.length > 1 && (
+                                  <>
+                                    {/* Left click area to navigate to NEXT banner image */}
+                                    <div 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        setActiveBannerIndex2(prev => (prev + 1) % activeBanners2.length);
+                                      }}
+                                      className="absolute top-0 bottom-0 left-0 w-[45%] z-20 cursor-pointer"
+                                      title="التالي"
+                                    />
+                                    {/* Right click area to navigate to PREVIOUS banner image */}
+                                    <div 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        setActiveBannerIndex2(prev => (prev - 1 + activeBanners2.length) % activeBanners2.length);
+                                      }}
+                                      className="absolute top-0 bottom-0 right-0 w-[45%] z-20 cursor-pointer"
+                                      title="السابق"
+                                    />
+                                  </>
+                                )}
                               </>
+                            ) : (
+                              // If empty, keep it quiet and clean as requested: (فاضي ما تحطش فيه صور)
+                              <div className="h-full flex items-center justify-center opacity-10">
+                                <i className="fas fa-images text-sm" />
+                              </div>
                             )}
-                          </>
-                        ) : (
-                          // If empty, keep it quiet and clean as requested: (فاضي ما تحطش فيه صور)
-                          <div className="h-full flex items-center justify-center opacity-10">
-                            <i className="fas fa-images text-sm" />
                           </div>
-                        )}
-                      </div>
+                        );
+                      })()}
 
                       {/* Grid for other remaining rooms of the application */}
                       {remainingRooms.length > 0 && (
@@ -1048,11 +1198,24 @@ const App: React.FC = () => {
           <div className="relative -top-3 flex flex-col items-center gap-1">
             <button 
               onClick={() => {
-                const userHasRoom = rooms.some(r => r.owner?.uid === user?.uid);
-                if (userHasRoom) {
-                  setShowHasRoomError(true);
+                if (isInSecretClub) {
+                  const userHasSecretRoom = rooms.some(r => r.owner?.uid === user?.uid && !!r.isSecretClub);
+                  if (userHasSecretRoom) {
+                    setHasRoomErrorCustomMsg(t("عذراً لديك غرفة بالفعل في النادي السري", "Sorry, you already have a room in the Secret Club"));
+                    setShowHasRoomError(true);
+                  } else {
+                    setIsCreateSecretRoom(true);
+                    setIsCreateModalOpen(true);
+                  }
                 } else {
-                  setIsCreateModalOpen(true);
+                  const userHasRoom = rooms.some(r => r.owner?.uid === user?.uid && !r.isSecretClub);
+                  if (userHasRoom) {
+                    setHasRoomErrorCustomMsg(t("عذراً لديك غرفة بالفعل", "Sorry, you already have a room"));
+                    setShowHasRoomError(true);
+                  } else {
+                    setIsCreateSecretRoom(false);
+                    setIsCreateModalOpen(true);
+                  }
                 }
               }} 
               className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-pink-500 shadow-lg flex items-center justify-center text-lg active:scale-90 transition-transform text-white"
@@ -1109,7 +1272,14 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <CreateRoomModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
+      <CreateRoomModal 
+        isOpen={isCreateModalOpen} 
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setIsCreateSecretRoom(false);
+        }} 
+        isSecretClub={isCreateSecretRoom}
+      />
       
       <AnimatePresence>
         {showHasRoomError && (
@@ -1131,7 +1301,9 @@ const App: React.FC = () => {
                 <i className="fas fa-exclamation-triangle text-2xl"></i>
               </div>
               <h4 className="text-white font-black text-sm mb-2">{t("تنبيه", "Warning")}</h4>
-              <p className="text-white/60 text-[11px] leading-relaxed mb-6 font-bold">{t("عذراً لديك غرفة بالفعل", "Sorry, you already have a room")}</p>
+              <p className="text-white/60 text-[11px] leading-relaxed mb-6 font-bold">
+                {hasRoomErrorCustomMsg || t("عذراً لديك غرفة بالفعل", "Sorry, you already have a room")}
+              </p>
               <button 
                 onClick={() => setShowHasRoomError(false)}
                 className="w-full py-3 bg-purple-600 text-white text-xs font-black rounded-xl active:scale-95 transition-transform"
@@ -1227,6 +1399,137 @@ const App: React.FC = () => {
         onClose={() => setShowRoomBanModal(false)} 
         roomName={kickedRoomName} 
       />
+
+      {/* Secret Club Password Entry Modal */}
+      {showSecretClubPasswordModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => {
+            setShowSecretClubPasswordModal(false);
+            setSecretClubPasswordInput('');
+            setSecretClubPasswordError('');
+          }}
+        >
+          <div 
+            className="bg-[#1a0b2e]/65 border border-white/15 rounded-3xl p-6 shadow-2xl backdrop-blur-xl w-full max-w-xs text-center relative animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => {
+                setShowSecretClubPasswordModal(false);
+                setSecretClubPasswordInput('');
+                setSecretClubPasswordError('');
+              }}
+              className="absolute top-4 right-4 w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all text-xs"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-3 text-white shadow-inner">
+              <i className="fas fa-user-secret text-xl"></i>
+            </div>
+
+            <h3 className="text-sm font-black text-white mb-1">
+              {t("النادي السري", "Secret Club")}
+            </h3>
+            <p className="text-[11px] text-white/50 mb-4 font-medium">
+              {t("يرجى إدخال باسورد الدخول للمتابعة", "Please enter the entry password to continue")}
+            </p>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              setSecretClubPasswordError('');
+              const trimmed = secretClubPasswordInput.trim();
+              const expected = String(userData?.secretClubPassword || '').trim();
+
+              if (!trimmed) {
+                setSecretClubPasswordError(t("يرجى إدخال باسورد الدخول", "Please enter the password"));
+                return;
+              }
+
+              if (expected && trimmed !== expected) {
+                setSecretClubPasswordError(t("باسورد الدخول غير صحيح!", "Incorrect password!"));
+                return;
+              }
+
+              // Matches! Open success welcome window
+              setShowSecretClubPasswordModal(false);
+              setSecretClubPasswordInput('');
+              setSecretClubPasswordError('');
+              setShowSecretClubWelcomeModal(true);
+            }}>
+              <div className="relative mb-3">
+                <input 
+                  type="password"
+                  value={secretClubPasswordInput}
+                  onChange={(e) => {
+                    setSecretClubPasswordInput(e.target.value);
+                    if (secretClubPasswordError) setSecretClubPasswordError('');
+                  }}
+                  placeholder={t("باسورد الدخول...", "Password...")}
+                  autoFocus
+                  className="w-full bg-white/10 border border-white/15 rounded-2xl py-2.5 px-4 text-xs text-white text-center tracking-widest placeholder:tracking-normal placeholder:text-white/30 outline-none focus:border-purple-400/50 transition-all font-mono backdrop-blur-sm"
+                />
+              </div>
+
+              {secretClubPasswordError && (
+                <p className="text-[10px] text-rose-400 font-bold mb-3 animate-pulse">
+                  {secretClubPasswordError}
+                </p>
+              )}
+
+              <button 
+                type="submit"
+                className="w-full bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-black py-2.5 rounded-2xl border border-white/15 transition-all shadow-lg backdrop-blur-sm"
+              >
+                {t("تأكيد", "Confirm")}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Secret Club Welcome Modal */}
+      {showSecretClubWelcomeModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setShowSecretClubWelcomeModal(false)}
+        >
+          <div 
+            className="bg-[#1a0b2e]/65 border border-white/15 rounded-3xl p-6 shadow-2xl backdrop-blur-xl w-full max-w-xs text-center relative animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => setShowSecretClubWelcomeModal(false)}
+              className="absolute top-4 right-4 w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all text-xs"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+
+            <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center mx-auto mb-3 text-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.2)]">
+              <i className="fas fa-check-circle text-2xl"></i>
+            </div>
+
+            <h3 className="text-sm font-black text-white mb-2">
+              {t("النادي السري", "Secret Club")}
+            </h3>
+            
+            <p className="text-xs text-white/90 font-bold mb-6 leading-relaxed">
+              {t("تم الدخول بنجاح استمتع بوقتك وافعل ما تريد", "Entered successfully, enjoy your time and do whatever you want")}
+            </p>
+
+            <button 
+              onClick={() => {
+                setShowSecretClubWelcomeModal(false);
+                setIsInSecretClub(true);
+              }}
+              className="w-full bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-black py-2.5 rounded-2xl border border-white/15 transition-all shadow-lg backdrop-blur-sm"
+            >
+              {t("دخول النادي السري", "Enter Secret Club")}
+            </button>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes slowRotate {
