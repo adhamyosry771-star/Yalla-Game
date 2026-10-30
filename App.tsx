@@ -78,6 +78,32 @@ const sanitizeFirestoreData = (val: any, seen = new WeakSet()): any => {
   return cleaned;
 };
 
+export const parseExpiryDate = (val: any): Date | null => {
+  if (!val) return null;
+  if (typeof val?.toDate === 'function') {
+    try {
+      return val.toDate();
+    } catch (e) {
+      // ignore
+    }
+  }
+  if (val instanceof Date) return val;
+  if (typeof val === 'number') {
+    return new Date(val > 1e11 ? val : val * 1000);
+  }
+  if (typeof val === 'string') {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d;
+  }
+  if (typeof val?.seconds === 'number') {
+    return new Date(val.seconds * 1000);
+  }
+  if (typeof val?._seconds === 'number') {
+    return new Date(val._seconds * 1000);
+  }
+  return null;
+};
+
 const App: React.FC = () => {
   const { language, t } = useLanguage();
   const [user, setUser] = useState<any>(null);
@@ -388,18 +414,22 @@ const App: React.FC = () => {
     const unsubscribeInventory = onSnapshot(collection(db, "users", user.uid, "inventory"), async (snap) => {
       const now = new Date();
       const userDocRef = doc(db, "users", user.uid);
+      const activeEntryUrls = new Set<string>();
+      const activeProfileCardUrls = new Set<string>();
 
       for (const itemDoc of snap.docs) {
         const item = itemDoc.data();
         const itemId = itemDoc.id;
 
-        if (item.expiresAt && !processedExpirations.current.has(itemId)) {
-          const expiration = item.expiresAt.toDate();
-          if (expiration < now) {
-            processedExpirations.current.add(itemId);
-            const itemTypeLabel = item.type === 'frame' ? t('الإطار', 'Frame') : item.type === 'entry' ? t('الدخولية', 'Entrance') : t('الخلفية', 'Background');
-            const itemIcon = item.type === 'frame' ? 'fa-id-badge' : item.type === 'entry' ? 'fa-door-open' : 'fa-image';
+        const expiration = parseExpiryDate(item.expiresAt);
+        const isExpired = expiration ? expiration < now : false;
 
+        if (isExpired) {
+          const itemTypeLabel = item.type === 'frame' ? t('الإطار', 'Frame') : item.type === 'entry' ? t('الدخولية', 'Entrance') : item.type === 'profileCard' ? t('بطاقة الملف', 'Profile Card') : t('الخلفية', 'Background');
+          const itemIcon = item.type === 'frame' ? 'fa-id-badge' : item.type === 'entry' ? 'fa-door-open' : item.type === 'profileCard' ? 'fa-id-card' : 'fa-image';
+
+          if (!processedExpirations.current.has(itemId)) {
+            processedExpirations.current.add(itemId);
             try {
               await addDoc(collection(db, "users", user.uid, "systemNotifications"), {
                 title: t("انتهت صلاحية العنصر", "Item Expired"),
@@ -409,45 +439,82 @@ const App: React.FC = () => {
                 icon: itemIcon,
                 createdAt: serverTimestamp()
               });
-
-              const updates: any = {};
-              if (item.type === 'frame' && userData?.currentFrame === item.imageUrl) updates.currentFrame = null;
-              if (item.type === 'entry' && userData?.currentEntry === item.videoUrl) updates.currentEntry = null;
-              if (item.type === 'background') {
-                try {
-                  const publicBgsSnapshot = await getDocs(query(collection(db, "roomBackgrounds"), limit(1)));
-                  const defaultBgUrl = !publicBgsSnapshot.empty ? publicBgsSnapshot.docs[0].data().imageUrl : null;
-                  
-                  if (userData?.currentRoomBackground === item.imageUrl || item.isEquipped) {
-                    updates.currentRoomBackground = defaultBgUrl;
-                  }
-
-                  // Also proactively find all rooms owned by the user and update if utilizing this background
-                  const roomsSnap = await getDocs(query(
-                    collection(db, "rooms"),
-                    where("owner.uid", "==", user.uid)
-                  ));
-                  for (const roomDoc of roomsSnap.docs) {
-                    const rData = roomDoc.data();
-                    if (rData.roomBackground === item.imageUrl) {
-                      await updateDoc(roomDoc.ref, {
-                        roomBackground: defaultBgUrl
-                      });
-                    }
-                  }
-                } catch (e) {
-                  console.error("Error resetting room backgrounds in expiration check:", e);
-                  updates.currentRoomBackground = null;
-                }
-              }
-
-              if (Object.keys(updates).length > 0) await updateDoc(userDocRef, updates);
-              await deleteDoc(itemDoc.ref);
-            } catch (err) {
-              console.error("Error processing expired item:", err);
-              processedExpirations.current.delete(itemId);
+            } catch (notifErr) {
+              console.error("Error creating expiry notification:", notifErr);
             }
           }
+
+          try {
+            const updates: any = {};
+            if (item.type === 'frame' && userData?.currentFrame === item.imageUrl) updates.currentFrame = null;
+            if (item.type === 'entry' && (userData?.currentEntry === item.videoUrl || userData?.currentEntry === item.imageUrl || userData?.currentEntry === item.previewImage)) {
+              updates.currentEntry = null;
+            }
+            if (item.type === 'profileCard' && (userData?.currentProfileCard === item.imageUrl || userData?.currentProfileCard === item.videoUrl)) {
+              updates.currentProfileCard = null;
+            }
+            if (item.type === 'background') {
+              try {
+                const publicBgsSnapshot = await getDocs(query(collection(db, "roomBackgrounds"), limit(1)));
+                const defaultBgUrl = !publicBgsSnapshot.empty ? publicBgsSnapshot.docs[0].data().imageUrl : null;
+                
+                if (userData?.currentRoomBackground === item.imageUrl || item.isEquipped) {
+                  updates.currentRoomBackground = defaultBgUrl;
+                }
+
+                // Also proactively find all rooms owned by the user and update if utilizing this background
+                const roomsSnap = await getDocs(query(
+                  collection(db, "rooms"),
+                  where("owner.uid", "==", user.uid)
+                ));
+                for (const roomDoc of roomsSnap.docs) {
+                  const rData = roomDoc.data();
+                  if (rData.roomBackground === item.imageUrl) {
+                    await updateDoc(roomDoc.ref, {
+                      roomBackground: defaultBgUrl
+                    });
+                  }
+                }
+              } catch (e) {
+                console.error("Error resetting room backgrounds in expiration check:", e);
+                updates.currentRoomBackground = null;
+              }
+            }
+
+            if (Object.keys(updates).length > 0) await updateDoc(userDocRef, updates);
+            await deleteDoc(itemDoc.ref);
+          } catch (err) {
+            console.error("Error processing expired item:", err);
+            processedExpirations.current.delete(itemId);
+          }
+        } else {
+          // Keep track of active unexpired URLs
+          if (item.type === 'entry') {
+            if (item.videoUrl) activeEntryUrls.add(item.videoUrl);
+            if (item.imageUrl) activeEntryUrls.add(item.imageUrl);
+          }
+          if (item.type === 'profileCard') {
+            if (item.imageUrl) activeProfileCardUrls.add(item.imageUrl);
+            if (item.videoUrl) activeProfileCardUrls.add(item.videoUrl);
+          }
+        }
+      }
+
+      // Proactively verify currentEntry integrity on user doc:
+      if (userData?.currentEntry && !activeEntryUrls.has(userData.currentEntry)) {
+        try {
+          await updateDoc(userDocRef, { currentEntry: null });
+        } catch (err) {
+          console.error("Error unsetting orphaned currentEntry:", err);
+        }
+      }
+
+      // Proactively verify currentProfileCard integrity on user doc:
+      if (userData?.currentProfileCard && !activeProfileCardUrls.has(userData.currentProfileCard)) {
+        try {
+          await updateDoc(userDocRef, { currentProfileCard: null });
+        } catch (err) {
+          console.error("Error unsetting orphaned currentProfileCard:", err);
         }
       }
     });
